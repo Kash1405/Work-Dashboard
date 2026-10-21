@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { googleClientId, hasEnvClientId, preloadGoogle, useGoogleClientId } from "../lib/google";
 import { exportAll, importAll } from "../lib/store";
+import { canPickFolder, chooseFolder, microsoftSync, useMsSyncMeta, useMsSyncStatus } from "../lib/microsoftSync";
 import { fileUrl, folderUrl, signIn, signOut, syncNow, useSyncMeta, useSyncStatus } from "../lib/sync";
 import { dateKey, downloadFile, timeLabel } from "../lib/utils";
 import { Icon } from "./ui";
@@ -14,6 +15,8 @@ const driveFiles = [
 export default function SyncChip() {
   const [status] = useSyncStatus();
   const [meta] = useSyncMeta();
+  const [msMeta] = useMsSyncMeta();
+  const [msStatus] = useMsSyncStatus();
   const [stored, setClientId] = useGoogleClientId();
   const clientId = googleClientId() || stored;
   const [open, setOpen] = useState(false);
@@ -80,6 +83,19 @@ export default function SyncChip() {
                   ? <button className="primary-button" onClick={() => signIn()}>Sign in</button>
                   : <button className="secondary-button" onClick={() => syncNow(true)} disabled={state === "syncing"}><Icon name="refresh" size={14}/> Check now</button>}
                 <button className="secondary-button" onClick={() => signOut()}>Sign out</button>
+              </div>
+              <div className="ms-sync">
+                <div className="ms-sync-head">
+                  <p className="eyebrow accent">MICROSOFT SYNC</p>
+                  {msMeta.at > 0 && <small>Last run {dateKey(new Date(msMeta.at)) === dateKey() ? timeLabel(new Date(msMeta.at)) : new Date(msMeta.at).toLocaleDateString()}</small>}
+                </div>
+                <p className="sync-copy">Saves Excel and Word copies of your Drive folder ({driveFiles.map((f) => f.label).join(", ")}) {canPickFolder() ? <>to a folder on this computer. Pick your <b>OneDrive</b> folder and they sync to Microsoft 365 too.</> : <>to your Downloads. (Use Chrome or Edge to save straight into a folder, such as your OneDrive.)</>} The copies are read-only snapshots; keep editing here or in Drive.</p>
+                {msStatus.error && <p className="sync-error">{msStatus.error}</p>}
+                {msStatus.message && !msStatus.error && <p className="ms-sync-done"><Icon name="check" size={13}/> {msStatus.message}</p>}
+                <div className="sync-buttons">
+                  <button className="primary-button" onClick={() => microsoftSync()} disabled={msStatus.busy || state === "syncing"}><Icon name="download" size={14}/> {msStatus.busy ? "Exporting…" : "Microsoft Sync"}</button>
+                  {canPickFolder() && msMeta.folder && <button className="text-button" onClick={() => chooseFolder().catch(() => undefined)} title="Choose another folder"><Icon name="folder" size={14}/> {msMeta.folder} · Change</button>}
+                </div>
               </div>
             </>
           ) : (

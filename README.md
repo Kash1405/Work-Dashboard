@@ -18,6 +18,14 @@ Changes upload a couple of seconds after you make them, and edits made in Drive 
 
 The site uses the same Google OAuth Client ID as the Personal Dashboard (set in `.github/workflows/deploy.yml`). Both sites live on `https://kash1405.github.io`, so the client's authorised JavaScript origin already covers this one. For local development, paste the Client ID into the sync menu and add `http://localhost:5180` to the client's authorised origins.
 
+## Microsoft Sync
+
+**Microsoft Sync** (in the sync menu, once Google Drive is connected) saves Excel and Word copies of the Drive folder to your computer: `Dashboard Data.xlsx`, `Dashboard Logs.xlsx`, `Notes.docx` and `About this folder.docx`. It saves any pending changes to Drive first, then has Drive convert the files.
+
+- In Chrome or Edge you pick a folder once and later runs overwrite the files there. Pick your OneDrive (for Business) folder and the copies sync to Microsoft 365 / SharePoint.
+- Other browsers download the files instead.
+- It only copies one way. Edits made to the Office copies are not read back; keep editing in the dashboard or in Google Drive.
+
 ## Development
 
 ```bash

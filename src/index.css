@@ -80,6 +80,11 @@ textarea { resize: vertical; }
 .sync-files a:hover { border-color: var(--accent); background: var(--accent-tint); }
 .sync-files small { color: var(--dim); font-weight: 400; }
 .sync-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.ms-sync { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.ms-sync-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ms-sync-head small { font-size: 11.5px; color: var(--dim); }
+.ms-sync .sync-copy { margin-top: 4px; }
+.ms-sync-done { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--green); margin: 0 0 10px; }
 .sync-backup { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; font-size: 12.5px; color: var(--muted); }
 .sync-backup span { margin-right: auto; }
 

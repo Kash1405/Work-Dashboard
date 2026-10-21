@@ -473,3 +473,33 @@ export function useDriveSync(active: boolean) {
   }, [active]);
 }
 
+
+// ---------- Office export (used by Microsoft Sync, lib/microsoftSync.ts) ----------
+
+const OFFICE: Record<Role, { mime: string; ext: string }> = {
+  data: { mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ext: "xlsx" },
+  logs: { mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ext: "xlsx" },
+  notes: { mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ext: "docx" },
+  readme: { mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ext: "docx" },
+};
+
+export type OfficeFile = { name: string; blob: Blob };
+
+// Saves any pending changes to Drive, then has Drive convert every file in the folder to
+// Excel/Word. Call from a click: Google may need to renew the session with a popup.
+export async function exportOffice(): Promise<OfficeFile[]> {
+  if (!meta().enabled) throw new Error("Connect Google Drive first.");
+  await syncNow(true, false);
+  if (!isFresh(token)) throw new Error("Google session expired. Click Microsoft Sync again to reconnect.");
+  const ids = meta().fileIds;
+  const out: OfficeFile[] = [];
+  for (const role of Object.keys(FILE_NAMES) as Role[]) {
+    const id = ids[role];
+    if (!id) continue;
+    const { mime, ext } = OFFICE[role];
+    const blob = await (await api(`${FILES_API}/${id}/export?mimeType=${encodeURIComponent(mime)}`)).blob();
+    out.push({ name: `${FILE_NAMES[role]}.${ext}`, blob });
+  }
+  if (!out.length) throw new Error("Nothing in the Drive folder yet. Wait for the first sync to finish.");
+  return out;
+}

@@ -55,8 +55,8 @@ export function formatDuration(totalSeconds: number) {
   return `${m}m ${pad(s)}s`;
 }
 
-export function downloadFile(name: string, content: string, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
+export function downloadFile(name: string, content: string | Blob, type = "") {
+  const url = URL.createObjectURL(content instanceof Blob ? content : new Blob([content], { type }));
   const link = document.createElement("a");
   link.href = url;
   link.download = name;
