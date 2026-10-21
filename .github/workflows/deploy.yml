@@ -27,10 +27,9 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES_BASE: /${{ github.event.repository.name }}/
-          # Optional repository variables (Settings → Secrets and variables → Actions → Variables).
-          # An app (client) ID and tenant ID are public identifiers, so variables (not secrets) are fine.
-          VITE_MS_CLIENT_ID: ${{ vars.MS_CLIENT_ID }}
-          VITE_MS_TENANT_ID: ${{ vars.MS_TENANT_ID }}
+          # Google OAuth Client ID (public, not a secret). Defaults to the one the Personal Dashboard uses,
+          # which already allows https://kash1405.github.io; override with a repository variable GOOGLE_CLIENT_ID.
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID || '939698004526-6se9id9h2hhspt33gf3bcs92eq4njfav.apps.googleusercontent.com' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

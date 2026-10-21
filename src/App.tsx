@@ -4,9 +4,8 @@ import SyncChip from "./components/SyncChip";
 import { Icon } from "./components/ui";
 import { timerRemaining, useFocusDraft, useFocusFlash, useFocusTimer, useSettings, type Tab } from "./lib/data";
 import { useCompleteSession } from "./lib/focus";
-import { useMsAccount } from "./lib/microsoft";
-import { syncOutlook, useOutlookStatus } from "./lib/outlook";
-import { useOneDriveSync, useSyncMeta } from "./lib/sharepoint";
+import { hasToken, syncGoogle, useGcalSettings } from "./lib/gcal";
+import { useDriveSync, useSyncMeta } from "./lib/sync";
 import { useStored } from "./lib/store";
 import { formatDuration, pad, playChime, useNow } from "./lib/utils";
 import Focus from "./tabs/Focus";
@@ -20,11 +19,10 @@ const tabs: { tab: Tab; icon: string }[] = [
 function Header({ active, setActive, onLock }: { active: Tab; setActive: (tab: Tab) => void; onLock: () => void }) {
   const now = useNow(1000);
   const [settings] = useSettings();
-  const [account] = useMsAccount();
   const [timer] = useFocusTimer();
   const remaining = timerRemaining(timer, now.getTime());
-  const name = settings.name.trim() || account?.name || "";
-  const initials = name.split(/[\s,]+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "AK";
+  const name = settings.name.trim();
+  const initials = name.split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "AK";
 
   return (
     <header className="topbar">
@@ -43,7 +41,7 @@ function Header({ active, setActive, onLock }: { active: Tab; setActive: (tab: T
         )}
         <SyncChip/>
         <button className="icon-button" onClick={onLock} aria-label="Lock the dashboard" title="Lock"><Icon name="lock"/></button>
-        <div className="avatar" title={account ? `${account.name} · ${account.username}` : name || "Set your name on the Overview tab"}>{initials}</div>
+        <div className="avatar" title={name || "Set your name on the Overview tab"}>{initials}</div>
       </div>
     </header>
   );
@@ -56,8 +54,7 @@ function useBackgroundJobs() {
   const [draft] = useFocusDraft();
   const [, setFlash] = useFocusFlash();
   const complete = useCompleteSession();
-  const [account] = useMsAccount();
-  const [outlook] = useOutlookStatus();
+  const [gcal] = useGcalSettings();
 
   // Focus timer finished: log it, chime, and show a message.
   useEffect(() => {
@@ -74,11 +71,11 @@ function useBackgroundJobs() {
     document.title = timer.endsAt !== null ? `▶ ${pad(Math.floor(remaining / 60))}:${pad(remaining % 60)} · Focus` : "Work Dashboard";
   }, [timer.endsAt, remaining]);
 
-  // Keep the Outlook calendar fresh while signed in to Microsoft.
+  // Keep Google Calendar fresh while the sign-in token is valid (about an hour per sign-in).
   const minute = Math.floor(now.getTime() / 60000);
   useEffect(() => {
-    if (account && !outlook.busy && Date.now() - outlook.lastTry > 5 * 60 * 1000) syncOutlook().catch(() => undefined);
-  }, [account, minute, outlook.busy, outlook.lastTry]);
+    if (gcal.enabled && hasToken() && Date.now() - gcal.lastSync > 5 * 60 * 1000) syncGoogle().catch(() => undefined);
+  }, [gcal.enabled, gcal.lastSync, minute]);
 }
 
 const SESSION_DAYS = 30;
@@ -90,7 +87,7 @@ export default function App() {
   const active: Tab = tabs.some((t) => t.tab === stored) ? stored : "Overview";
   const unlocked = session || authUntil > Date.now();
   useBackgroundJobs();
-  useOneDriveSync(unlocked);
+  useDriveSync(unlocked);
   const [syncMeta] = useSyncMeta();
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -115,7 +112,7 @@ export default function App() {
       <Header active={active} setActive={setActive} onLock={lock}/>
       {active === "Overview" && <Overview/>}
       {active === "Focus" && <Focus/>}
-      <footer><span>WORK DASHBOARD · PRIVATE</span><span>{syncMeta.enabled ? "Source of truth: OneDrive › Work Dashboard" : "Saved in this browser · connect Microsoft 365 to sync"} <i/></span></footer>
+      <footer><span>WORK DASHBOARD · PRIVATE</span><span>{syncMeta.enabled ? "Source of truth: Google Drive › Work Dashboard" : "Saved in this browser · connect Google Drive to sync"} <i/></span></footer>
     </div>
   );
 }

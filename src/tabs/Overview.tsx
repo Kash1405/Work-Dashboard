@@ -2,9 +2,8 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Icon, Panel, PanelTitle } from "../components/ui";
 import { buildings } from "../lib/buildings";
 import { useDailyTasks, useEvents, useGoals, useLinks, useNotes, useSettings, type QuickLink } from "../lib/data";
-import { msConfig, useMsAccount } from "../lib/microsoft";
-import { createOutlookEvent, deleteOutlookEvent, syncOutlook, useOutlookEvents, useOutlookStatus } from "../lib/outlook";
-import { connectOneDrive } from "../lib/sharepoint";
+import { authorize, createGoogleEvent, deleteGoogleEvent, disconnectGoogle, hasToken, preloadGoogle, syncGoogle, useGcalEvents, useGcalSettings, useGcalStatus } from "../lib/gcal";
+import { googleClientId, hasEnvClientId, useGoogleClientId } from "../lib/google";
 import { atTime, dateKey, pad, parseDateKey, relativeDay, submitOnEnter, timeLabel, uid, useNow } from "../lib/utils";
 
 export default function Overview() {
@@ -29,21 +28,18 @@ export default function Overview() {
 
 function Welcome({ now }: { now: Date }) {
   const [settings, setSettings] = useSettings();
-  const [account] = useMsAccount();
   const [editing, setEditing] = useState(false);
   const hour = now.getHours();
   const greeting = hour < 5 ? "Working late" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone.split("/").pop()?.replace(/_/g, " ");
-  // Work accounts are often "Last, First"; show the first name.
-  const accountName = account?.name.includes(",") ? account.name.split(",")[1].trim().split(/\s+/)[0] : account?.name.split(/\s+/)[0];
-  const name = settings.name || accountName || "";
+  const name = settings.name;
   return (
     <div className="welcome">
       <div>
         <p className="eyebrow accent">{now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" }).toUpperCase()}</p>
         {editing ? (
           <form className="name-form" onSubmit={(event) => { event.preventDefault(); setEditing(false); }}>
-            <input autoFocus value={settings.name} onChange={(event) => setSettings({ ...settings, name: event.target.value })} onBlur={() => setEditing(false)} placeholder={accountName || "Your name"} aria-label="Your name"/>
+            <input autoFocus value={settings.name} onChange={(event) => setSettings({ ...settings, name: event.target.value })} onBlur={() => setEditing(false)} placeholder="Your name" aria-label="Your name"/>
           </form>
         ) : (
           <h1>
@@ -61,20 +57,20 @@ function Welcome({ now }: { now: Date }) {
   );
 }
 
-// The calendar in use: Outlook while signed in to Microsoft, otherwise the one kept in this browser.
-type AgendaEvent = { id: string; title: string; date: string; time: string; endTime?: string; source: "local" | "outlook"; link?: string; online?: string };
+// Events kept in this browser, plus Google Calendar while it is linked.
+type AgendaEvent = { id: string; title: string; date: string; time: string; source: "local" | "google"; link?: string };
 
 function useCalendar(): AgendaEvent[] {
-  const [account] = useMsAccount();
-  const [outlook] = useOutlookEvents();
   const [local] = useEvents();
+  const [google] = useGcalEvents();
+  const [gcal] = useGcalSettings();
   return useMemo(
-    () => (account ? outlook.map((e) => ({ ...e, source: "outlook" as const })) : local.map((e) => ({ ...e, source: "local" as const }))),
-    [account, outlook, local],
+    () => [...local.map((e) => ({ ...e, source: "local" as const })), ...(gcal.enabled ? google.map((e) => ({ ...e, source: "google" as const })) : [])],
+    [local, google, gcal.enabled],
   );
 }
 
-type Upcoming = { key: string; kind: "Meeting" | "Task"; title: string; at: Date; allDay: boolean; online?: string };
+type Upcoming = { key: string; kind: "Meeting" | "Task"; title: string; at: Date; allDay: boolean };
 
 function useUpcoming(now: Date) {
   const events = useCalendar();
@@ -88,7 +84,7 @@ function useUpcoming(now: Date) {
       if (event.date < today) continue;
       const at = atTime(event.date, event.time || undefined);
       if (event.time && at <= current) continue;
-      items.push({ key: `e${event.id}`, kind: "Meeting", title: event.title, at, allDay: !event.time, online: event.online });
+      items.push({ key: `e${event.id}`, kind: "Meeting", title: event.title, at, allDay: !event.time });
     }
     for (const task of tasks) {
       if (!task.time || task.done) continue;
@@ -124,12 +120,11 @@ function NextUp({ now }: { now: Date }) {
         <img key={b.src} className={`hero-image ${index === image ? "active" : ""}`} src={b.src} alt="" aria-hidden="true" style={{ objectPosition: b.position }} loading={index === image ? "eager" : "lazy"}/>
       ))}
       <div className="hero-shade"/>
-      <div className="hero-copy">
+      <div className={`hero-copy ${next ? "" : "idle"}`}>
         <span className="live-pill"><i/> UP NEXT · {next ? next.kind.toUpperCase() : "ALL CLEAR"}</span>
         <h2>{next ? next.title : "Nothing scheduled"}</h2>
         <p>
           {next ? <>{relativeDay(next.at)} <span>·</span> {next.allDay ? "All day" : timeLabel(next.at)}</> : "Add a calendar event or a timed task to see it here."}
-          {next?.online && <> <span>·</span> <a href={next.online} target="_blank" rel="noreferrer">Join meeting</a></>}
         </p>
       </div>
       {next && (
@@ -248,16 +243,18 @@ function PlanPanel() {
 }
 
 function CalendarPanel() {
-  const [account] = useMsAccount();
   const [localEvents, setLocalEvents] = useEvents();
-  const [ostatus] = useOutlookStatus();
+  const [gcal] = useGcalSettings();
+  const [gstatus] = useGcalStatus();
+  const [storedClientId, setClientId] = useGoogleClientId();
+  const clientId = googleClientId() || storedClientId;
   const events = useCalendar();
   const today = dateKey();
   const [selected, setSelected] = useState(today);
   const [view, setView] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
   const [message, setMessage] = useState("");
   const year = view.getFullYear();
   const month = view.getMonth();
@@ -265,32 +262,40 @@ function CalendarPanel() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const eventDays = new Set(events.map((event) => event.date));
   const dayEvents = events.filter((event) => event.date === selected).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  const live = gcal.enabled && gstatus.authed;
+
+  useEffect(() => {
+    if (clientId) preloadGoogle().catch(() => undefined);
+  }, [clientId]);
 
   const report = (error: unknown) => setMessage(error instanceof Error ? error.message : "Something went wrong.");
+  // Gets a token if needed. Call only from a click handler so Google's popup is allowed.
+  const ensureGoogle = async () => {
+    if (!hasToken()) await authorize();
+  };
 
   const connect = async () => {
     setMessage("");
-    if (!msConfig().clientId) {
-      setMessage("Add your Microsoft app ID first: open the sync menu at the top right.");
-      return;
+    try {
+      await ensureGoogle();
+      await syncGoogle();
+      setShowSetup(false);
+    } catch (error) {
+      report(error);
     }
-    await connectOneDrive();
-    syncOutlook(true).catch(report);
   };
 
   const addEvent = async () => {
     if (!title.trim()) return;
     setMessage("");
     const name = title.trim();
-    if (account) {
-      setBusy(true);
+    if (gcal.enabled) {
       try {
-        await createOutlookEvent(name, selected, time);
+        await ensureGoogle();
+        await createGoogleEvent(name, selected, time);
       } catch (error) {
         report(error);
         return;
-      } finally {
-        setBusy(false);
       }
     } else {
       setLocalEvents([...localEvents, { id: uid(), title: name, date: selected, time }]);
@@ -304,9 +309,10 @@ function CalendarPanel() {
       setLocalEvents(localEvents.filter((item) => item.id !== event.id));
       return;
     }
-    if (!window.confirm(`Delete “${event.title}” from your Outlook calendar?`)) return;
+    if (!window.confirm(`Delete “${event.title}” from your Google Calendar?`)) return;
     try {
-      await deleteOutlookEvent(event.id);
+      await ensureGoogle();
+      await deleteGoogleEvent(event.id);
     } catch (error) {
       report(error);
     }
@@ -331,21 +337,41 @@ function CalendarPanel() {
         }
       />
       <div className="cal-bar">
-        {account ? (
+        {gcal.enabled ? (
           <>
-            <span className={`cal-dot ${ostatus.error ? "" : "on"}`}/>
-            <span>Outlook calendar{ostatus.lastSync ? ` · synced ${timeLabel(new Date(ostatus.lastSync))}` : ""}</span>
-            <button className="text-button strong" onClick={() => { setMessage(""); syncOutlook(true).catch(report); }} disabled={ostatus.busy}><Icon name="refresh" size={13}/> {ostatus.busy ? "Syncing…" : "Sync"}</button>
+            <span className={`cal-dot ${live ? "on" : ""}`}/>
+            <span>{live ? "Google Calendar linked" : "Google Calendar: reconnect to sync"}{gcal.lastSync ? ` · synced ${timeLabel(new Date(gcal.lastSync))}` : ""}</span>
+            <button className="text-button strong" onClick={connect} disabled={gstatus.busy}><Icon name="refresh" size={13}/> {gstatus.busy ? "Syncing…" : "Sync"}</button>
+            <button className="text-button" onClick={() => setShowSetup(!showSetup)}>Settings</button>
           </>
         ) : (
           <>
             <span className="cal-dot"/>
             <span>Local calendar</span>
-            <button className="text-button strong" onClick={connect}>Connect Outlook</button>
+            <button className="text-button strong" onClick={() => setShowSetup(!showSetup)}>Link Google Calendar</button>
           </>
         )}
       </div>
-      {(message || ostatus.error) && <p className="cal-error">{message || ostatus.error}</p>}
+      {showSetup && (
+        <div className="cal-setup">
+          {!hasEnvClientId() && <label>Google OAuth Client ID<input value={clientId} onChange={(event) => setClientId(event.target.value.trim())} placeholder="xxxxxxxx.apps.googleusercontent.com" autoComplete="off"/></label>}
+          <details>
+            <summary>How to get a Client ID (one-time, ~5 minutes; the same ID also powers Drive sync)</summary>
+            <ol>
+              <li>Open <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noreferrer">Google Cloud Console</a>, create a project, and enable the <b>Google Calendar API</b> and <b>Google Drive API</b>.</li>
+              <li>Under <b>OAuth consent screen</b>, choose External, fill in the app name, and add your own Google account as a <b>test user</b>.</li>
+              <li>Under <b>Credentials → Create credentials → OAuth client ID</b>, pick <b>Web application</b>.</li>
+              <li>In <b>Authorised JavaScript origins</b>, add <code>{window.location.origin}</code> (and your published dashboard address).</li>
+              <li>Copy the Client ID into the box above, then click Connect.</li>
+            </ol>
+          </details>
+          <div className="cal-actions">
+            <button className="primary-button" onClick={connect} disabled={!clientId || gstatus.busy}>{gcal.enabled ? "Reconnect & sync" : "Connect"}</button>
+            {gcal.enabled && <button className="secondary-button" onClick={() => { disconnectGoogle(); setShowSetup(false); }}>Unlink</button>}
+          </div>
+        </div>
+      )}
+      {(message || gstatus.error) && <p className="cal-error">{message || gstatus.error}</p>}
       <div className="calendar">
         {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => <b key={i}>{day}</b>)}
         {Array.from({ length: offset }, (_, i) => <span key={`blank${i}`}/>)}
@@ -362,16 +388,16 @@ function CalendarPanel() {
             <i/>
             <div>
               <strong>{event.link ? <a href={event.link} target="_blank" rel="noreferrer">{event.title}</a> : event.title}</strong>
-              <span>{event.time ? `${event.time}${event.endTime ? `–${event.endTime}` : ""}` : "All day"}{event.online && <> · <a href={event.online} target="_blank" rel="noreferrer">Join</a></>}</span>
+              <span>{event.time || "All day"}{event.source === "google" ? " · Google" : ""}</span>
             </div>
             <button className="row-delete" onClick={() => removeEvent(event)} aria-label={`Delete ${event.title}`}><Icon name="x" size={13}/></button>
           </div>
         ))}
         {dayEvents.length === 0 && <p className="empty">Nothing scheduled. Add an event for this day.</p>}
         <form className="quick-add with-extra" onKeyDown={submitOnEnter} onSubmit={(event) => { event.preventDefault(); addEvent(); }}>
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={account ? "New Outlook event..." : "New event..."} aria-label="New event title"/>
+          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={gcal.enabled ? "New Google event..." : "New event..."} aria-label="New event title"/>
           <input type="time" value={time} onChange={(event) => setTime(event.target.value)} aria-label="Event time (optional)" title="Leave empty for all day"/>
-          <button type="submit" disabled={busy}><Icon name="plus" size={14}/> Add</button>
+          <button type="submit"><Icon name="plus" size={14}/> Add</button>
         </form>
       </div>
     </Panel>
@@ -437,7 +463,7 @@ function LinksPanel() {
           </div>
           <form className="link-add" onKeyDown={submitOnEnter} onSubmit={(event) => { event.preventDefault(); addLink(); }}>
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Display name" aria-label="New link display name"/>
-            <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="Address, e.g. outlook.office.com" aria-label="New link address"/>
+            <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="Address, e.g. mail.google.com" aria-label="New link address"/>
             <button type="submit" className="secondary-button" disabled={!url.trim()}><Icon name="plus" size={14}/> Add link</button>
           </form>
         </>

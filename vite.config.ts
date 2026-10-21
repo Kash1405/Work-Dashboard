@@ -6,8 +6,6 @@ import path from 'node:path'
 // The GitHub Pages workflow sets GITHUB_PAGES_BASE (e.g. /Work-Dashboard/).
 export default defineConfig({
   base: process.env.GITHUB_PAGES_BASE || '/',
-  // MSAL alone is ~300 kB; one bundle is fine for a personal dashboard.
-  build: { chunkSizeWarningLimit: 800 },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

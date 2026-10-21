@@ -1,26 +1,22 @@
 # Work Dashboard
 
-A private, single-page work dashboard (React + Vite + Tailwind v4), styled with the Accenture palette.
+A private, single-page work dashboard (React + Vite + Tailwind v4), styled with the Accenture palette. It shares its sign-in and sync design with the Personal Dashboard ([Dashboard-AK](https://github.com/Kash1405/Dashboard-AK)).
 
 - **Lock screen**: password unlock, the same as the Personal Dashboard.
-- **Overview**: a rotating city-skyline hero with a countdown to your next meeting or timed task, plus Daily Tasks, Overall Goals, Links, Calendar and Notes.
+- **Overview**: a rotating city-skyline hero with a countdown to your next event or timed task, plus Daily Tasks, Overall Goals, Links, Calendar and Notes.
 - **Focus**: a session timer and the completed-task log.
 
-## Microsoft 365
+## Google sign-in and sync
 
-Sign in with a Microsoft work account (MSAL, from the sync menu at the top right) to:
+Sign in with Google from the sync menu at the top right to keep everything in a **Work Dashboard** folder in your Google Drive:
 
-- keep all data in a **Work Dashboard** folder in your OneDrive for Business (your personal SharePoint): `Tasks.csv`, `Goals.csv`, `Links.csv`, `Focus Log.csv`, `Settings.csv` and `Notes.txt`. The dashboard saves changes there within seconds and picks up edits made to the files every 30 seconds. If both sides changed, the OneDrive copy wins.
-- sync the **calendar with Outlook** both ways: Outlook events appear on the dashboard (refreshed every 5 minutes or with **Sync**), and events you add or delete on the dashboard are written to Outlook.
+- **Dashboard Data** (Sheet): Settings, Links, Daily Tasks, Goals and Calendar Events tabs.
+- **Dashboard Logs** (Sheet): Focus Sessions.
+- **Notes** (Doc).
 
-### One-time app registration
+Changes upload a couple of seconds after you make them, and edits made in Drive load in every 30 seconds. If both sides changed, Drive wins. **Link Google Calendar** on the Calendar panel to show your Google events and to add or delete them from the dashboard.
 
-1. In [Microsoft Entra → App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade), create a **New registration**, for accounts in this organizational directory only.
-2. Add a **Single-page application** redirect URI for each address you open the dashboard from, ending in `/redirect.html`: for example `http://localhost:5180/redirect.html` and `https://kash1405.github.io/Work-Dashboard/redirect.html`.
-3. Under **API permissions**, add the Microsoft Graph delegated permissions `User.Read`, `Files.ReadWrite` and `Calendars.ReadWrite`.
-4. Paste the **Application (client) ID** and **Directory (tenant) ID** into the dashboard's sync menu. Or set them as the repository variables `MS_CLIENT_ID` and `MS_TENANT_ID` so the GitHub Pages build includes them.
-
-If your organisation blocks app registrations or user consent, IT has to register or approve the app.
+The site uses the same Google OAuth Client ID as the Personal Dashboard (set in `.github/workflows/deploy.yml`). Both sites live on `https://kash1405.github.io`, so the client's authorised JavaScript origin already covers this one. For local development, paste the Client ID into the sync menu and add `http://localhost:5180` to the client's authorised origins.
 
 ## Development
 
@@ -31,6 +27,6 @@ npm run build
 npm run vault      # set a new lock-screen password (rewrites src/lib/vault.data.ts)
 ```
 
-Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`. In the repository settings, set Pages → Source to **GitHub Actions**.
+Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`.
 
 Skyline photos are from Wikimedia Commons under CC BY-SA licences; each photo is credited on the page.

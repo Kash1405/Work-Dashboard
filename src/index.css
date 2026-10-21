@@ -68,17 +68,17 @@ textarea { resize: vertical; }
 .sync-pop { position: absolute; right: 0; top: calc(100% + 10px); width: min(400px, 92vw); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 6px; padding: 18px; box-shadow: 0 18px 40px rgba(0,0,0,.18); z-index: 30; }
 .sync-pop-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .sync-folder { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; }
-.sync-account { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; padding: 10px 12px; background: var(--soft); border: 1px solid var(--line); border-radius: 4px; }
-.sync-account span { display: grid; }
-.sync-account small { color: var(--muted); }
 .sync-copy { font-size: 13px; color: var(--muted); margin: 8px 0 12px; }
 .sync-error, .cal-error { font-size: 13px; color: var(--red); background: #fdf0f2; border: 1px solid #f5c9d1; border-radius: 4px; padding: 8px 10px; margin: 8px 0; }
 .sync-field { display: grid; gap: 5px; font-size: 12.5px; font-weight: 600; margin-bottom: 10px; }
-.sync-field small { color: var(--dim); font-weight: 400; }
 .sync-steps { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
 .sync-steps summary { cursor: pointer; color: var(--accent-dark); font-weight: 600; }
 .sync-steps ol { padding-left: 18px; margin: 8px 0 0; display: grid; gap: 6px; }
 .sync-steps code { font-size: 11.5px; background: var(--accent-tint); padding: 1px 4px; border-radius: 3px; word-break: break-all; }
+.sync-files { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
+.sync-files a { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; text-decoration: none; color: var(--ink); font-size: 13px; font-weight: 500; }
+.sync-files a:hover { border-color: var(--accent); background: var(--accent-tint); }
+.sync-files small { color: var(--dim); font-weight: 400; }
 .sync-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 .sync-backup { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; font-size: 12.5px; color: var(--muted); }
 .sync-backup span { margin-right: auto; }
@@ -131,6 +131,7 @@ textarea { resize: vertical; }
 .hero-image.active { opacity: 1; }
 .hero-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.45) 55%, rgba(0,0,0,.1) 100%), linear-gradient(0deg, rgba(70,0,115,.55) 0%, transparent 45%); }
 .hero-copy { position: relative; padding: 28px 30px 8px; max-width: 70%; }
+.hero-copy.idle { padding-bottom: 54px; }
 .live-pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 11px; background: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: .12em; border-radius: 2px; }
 .live-pill i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: pulse 1.6s infinite; }
 .hero-copy h2 { margin: 14px 0 6px; font-size: clamp(24px, 2.8vw, 34px); line-height: 1.15; font-weight: 700; letter-spacing: -.01em; }
@@ -197,6 +198,12 @@ textarea { resize: vertical; }
 .calendar button.selected { background: var(--accent); color: #fff; }
 .calendar button.event:after { content: ""; position: absolute; bottom: 4px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); }
 .calendar button.selected.event:after { background: #fff; }
+.cal-setup { display: grid; gap: 10px; padding: 12px; margin-bottom: 12px; background: var(--soft); border: 1px solid var(--line); border-radius: 4px; font-size: 13px; color: var(--muted); }
+.cal-setup label { display: grid; gap: 5px; font-weight: 600; color: var(--ink); font-size: 12.5px; }
+.cal-setup summary { cursor: pointer; color: var(--accent-dark); font-weight: 600; }
+.cal-setup ol { padding-left: 18px; margin: 8px 0 0; display: grid; gap: 6px; }
+.cal-setup code { font-size: 11.5px; background: var(--accent-tint); padding: 1px 4px; border-radius: 3px; word-break: break-all; }
+.cal-actions { display: flex; gap: 8px; }
 .agenda { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 4px; }
 .agenda-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); margin-bottom: 4px; }
 .agenda-head small { color: var(--accent-dark); font-weight: 600; letter-spacing: .1em; font-size: 11px; }
