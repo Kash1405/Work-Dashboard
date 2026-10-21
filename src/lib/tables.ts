@@ -1,4 +1,5 @@
-import type { CalEvent, DailyTask, FocusLog, Goal, Note, QuickLink, Settings } from "./data";
+import type { ActionItem, CalEvent, DailyTask, FocusLog, Goal, Meeting, Note, QuickLink, Settings } from "./data";
+import { asGuideApp, defaultChecklists, defaultShortcuts, type Checklist, type GuideLink, type Shortcut } from "./guides";
 import { peekStored, setStored } from "./store";
 import { pad, uid } from "./utils";
 
@@ -70,13 +71,13 @@ const settingsTable: Table = {
 };
 
 // A plain list keyed by an ID column; rows added in Sheets without an ID get one.
-function listTable<T extends { id: string }>(file: FileRole, sheet: string, key: string, columns: [string, (item: T) => Cell, (s: string) => Partial<T>][]): Table {
+function listTable<T extends { id: string }>(file: FileRole, sheet: string, key: string, columns: [string, (item: T) => Cell, (s: string) => Partial<T>][], fallback: T[] = []): Table {
   return {
     file,
     sheet,
     headers: ["ID", ...columns.map(([h]) => h)],
     keys: [key],
-    rows: () => get<T[]>(key, []).map((item) => [item.id, ...columns.map(([, out]) => out(item))]),
+    rows: () => get<T[]>(key, fallback).map((item) => [item.id, ...columns.map(([, out]) => out(item))]),
     apply: (rows) => {
       const items = rows
         .filter((r) => r.slice(1).some((c) => c.trim()))
@@ -110,6 +111,45 @@ const linksTable = listTable<QuickLink>("data", "Links", "links", [
   ["URL", (l) => l.url, (s) => ({ url: s.trim() })],
 ]);
 
+// Guidelines & Shortcuts
+const shortcutsTable = listTable<Shortcut>("data", "Shortcuts", "guide.shortcuts", [
+  ["App", (r) => r.app, (s) => ({ app: asGuideApp(s) })],
+  ["Task", (r) => r.task, (s) => ({ task: s })],
+  ["Shortcut", (r) => r.keys, (s) => ({ keys: s })],
+  ["Description", (r) => r.description, (s) => ({ description: s })],
+], defaultShortcuts);
+
+const guideLinksTable = listTable<GuideLink>("data", "Guide Links", "guide.links", [
+  ["App", (l) => l.app, (s) => ({ app: asGuideApp(s) })],
+  ["Name", (l) => l.name, (s) => ({ name: s.trim() })],
+  ["URL", (l) => l.url, (s) => ({ url: s.trim() })],
+]);
+
+// One row per checklist item; a checklist with no items keeps a row with an empty item.
+const checklistsTable: Table = {
+  file: "data",
+  sheet: "Checklists",
+  headers: ["Checklist ID", "App", "Checklist", "Item ID", "Item", "Done"],
+  keys: ["guide.checklists"],
+  rows: () =>
+    get<Checklist[]>("guide.checklists", defaultChecklists).flatMap((c) =>
+      c.items.length ? c.items.map((item): Cell[] => [c.id, c.app, c.title, item.id, item.text, item.done]) : [[c.id, c.app, c.title, "", "", false]],
+    ),
+  apply: (rows) => {
+    const lists: Checklist[] = [];
+    for (const r of rows) {
+      const [cid = "", app = "", title = "", iid = "", text = "", done = ""] = r;
+      if (!title.trim() && !text.trim()) continue;
+      const id = cid.trim() || `${app.trim()}|${title.trim()}`;
+      let list = lists.find((l) => l.id === id);
+      if (!list) lists.push((list = { id, app: asGuideApp(app), title: title.trim() || "Checklist", items: [] }));
+      if (text.trim()) list.items.push({ id: iid.trim() || uid(), text: text.trim(), done: yes(done) });
+    }
+    // Rows typed in Sheets without a checklist ID were grouped by app and name; give them a real ID.
+    setStored<Checklist[]>("guide.checklists", lists.map((l) => (l.id.includes("|") ? { ...l, id: uid() } : l)));
+  },
+};
+
 // ---------- Dashboard Logs ----------
 
 const focusTable: Table = {
@@ -128,7 +168,50 @@ const focusTable: Table = {
     ),
 };
 
-export const TABLES: Table[] = [settingsTable, linksTable, tasksTable, goalsTable, eventsTable, focusTable];
+// Action items sit in one cell, one per line: "[x] Task | Owner | Due".
+const actionLine = (a: ActionItem) => `[${a.done ? "x" : " "}] ${[a.task, a.owner, a.due].join(" | ").replace(/( \| )+$/, "")}`;
+function parseActions(cell: string): ActionItem[] {
+  return cell.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const m = /^\[([ xX✓]?)\]\s*/.exec(line);
+    const [task = "", owner = "", due = ""] = line.slice(m ? m[0].length : 0).split("|").map((p) => p.trim());
+    return { id: uid(), task, owner, due: due ? date(due) : "", done: !!m && m[1].trim() !== "" };
+  }).filter((a) => a.task);
+}
+
+const meetingsTable: Table = {
+  file: "logs",
+  sheet: "Meeting Minutes",
+  headers: ["Created At", "Meeting", "Date", "Time", "Location", "Chair", "Minute Taker", "Attendees", "Apologies", "Objective", "Discussion", "Decisions", "Action Items", "Next Meeting", "Notes", "Updated At", "ID"],
+  keys: ["meetings"],
+  rows: () =>
+    byDateDesc(get<Meeting[]>("meetings", []).map((m) => [m.createdAt, m.name, m.date, m.time, m.location, m.chair, m.minuteTaker, m.attendees, m.apologies, m.objective, m.discussion, m.decisions, m.actions.map(actionLine).join("\n"), m.nextMeeting, m.notes, m.updatedAt, m.id])),
+  apply: (rows) => {
+    const local = get<Meeting[]>("meetings", []);
+    setStored<Meeting[]>(
+      "meetings",
+      rows
+        .filter((r) => r[1]?.trim())
+        .map((r) => {
+          const id = r[16]?.trim() || uid();
+          const actions = parseActions(r[12] ?? "");
+          // Keep this device's action IDs where the text still matches, so open editors don't jump.
+          const old = local.find((m) => m.id === id)?.actions ?? [];
+          actions.forEach((a, i) => {
+            if (old[i]?.task === a.task) a.id = old[i].id;
+          });
+          const createdAt = dateTime(r[0] ?? "");
+          return {
+            id, createdAt, name: r[1].trim(), date: r[2] ? date(r[2]) : "", time: r[3] ? time(r[3]) : "", location: r[4] ?? "", chair: r[5] ?? "", minuteTaker: r[6] ?? "",
+            attendees: r[7] ?? "", apologies: r[8] ?? "", objective: r[9] ?? "", discussion: r[10] ?? "", decisions: r[11] ?? "", actions,
+            nextMeeting: r[13] ? date(r[13]) : "", notes: r[14] ?? "", updatedAt: r[15]?.trim() ? dateTime(r[15]) : createdAt,
+          };
+        })
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    );
+  },
+};
+
+export const TABLES: Table[] = [settingsTable, linksTable, tasksTable, goalsTable, eventsTable, shortcutsTable, checklistsTable, guideLinksTable, focusTable, meetingsTable];
 
 // ---------- Notes doc ----------
 // Each note starts with a heading line "— 2026-10-18 10:21 —"; anything above the first one is ignored.

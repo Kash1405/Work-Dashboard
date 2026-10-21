@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Icon, Panel, PanelTitle } from "../components/ui";
 import { buildings } from "../lib/buildings";
-import { useDailyTasks, useEvents, useGoals, useLinks, useNotes, useSettings, type QuickLink } from "../lib/data";
+import { quotes, useDailyTasks, useEvents, useGoals, useLinks, useNotes, useSettings, type QuickLink } from "../lib/data";
 import { authorize, createGoogleEvent, deleteGoogleEvent, disconnectGoogle, hasToken, preloadGoogle, syncGoogle, useGcalEvents, useGcalSettings, useGcalStatus } from "../lib/gcal";
 import { googleClientId, hasEnvClientId, useGoogleClientId } from "../lib/google";
 import { atTime, dateKey, pad, parseDateKey, relativeDay, submitOnEnter, timeLabel, uid, useNow } from "../lib/utils";
@@ -11,6 +11,7 @@ export default function Overview() {
   return (
     <main className="page">
       <Welcome now={now}/>
+      <QuotePanel/>
       <div className="overview-grid">
         <div className="main-column">
           <NextUp now={now}/>
@@ -23,6 +24,31 @@ export default function Overview() {
         </aside>
       </div>
     </main>
+  );
+}
+
+function QuotePanel() {
+  // A random quote every 5 hours (seeded by the 5-hour slot, so it stays put until the slot changes).
+  // "Next quote" jumps to another random one. The Overview re-renders every second, so it rolls over on its own.
+  const slot = Math.floor(Date.now() / (5 * 60 * 60 * 1000));
+  const [picked, setPicked] = useState<{ slot: number; index: number } | null>(null);
+  const seeded = Math.imul(slot ^ 0x9e3779b9, 2654435761) >>> 0;
+  const index = picked?.slot === slot ? picked.index : seeded % quotes.length;
+  const quote = quotes[index];
+  const next = () => {
+    let i = index;
+    while (i === index && quotes.length > 1) i = Math.floor(Math.random() * quotes.length);
+    setPicked({ slot, index: i });
+  };
+  return (
+    <Panel className="quote-panel">
+      <span className="quote-mark">“</span>
+      <blockquote>“{quote.text}”</blockquote>
+      <div className="quote-foot">
+        <p>— {quote.by}</p>
+        <button className="text-button" onClick={next}>Next quote <Icon name="arrow" size={13}/></button>
+      </div>
+    </Panel>
   );
 }
 

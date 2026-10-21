@@ -9,11 +9,15 @@ import { useDriveSync, useSyncMeta } from "./lib/sync";
 import { useStored } from "./lib/store";
 import { formatDuration, pad, playChime, useNow } from "./lib/utils";
 import Focus from "./tabs/Focus";
+import Guidelines from "./tabs/Guidelines";
+import Meetings from "./tabs/Meetings";
 import Overview from "./tabs/Overview";
 
-const tabs: { tab: Tab; icon: string }[] = [
+const tabs: { tab: Tab; icon: string; label?: string }[] = [
   { tab: "Overview", icon: "grid" },
   { tab: "Focus", icon: "focus" },
+  { tab: "Meetings", icon: "clipboard" },
+  { tab: "Guidelines", icon: "keyboard", label: "Guidelines & Shortcuts" },
 ];
 
 function Header({ active, setActive, onLock }: { active: Tab; setActive: (tab: Tab) => void; onLock: () => void }) {
@@ -28,10 +32,10 @@ function Header({ active, setActive, onLock }: { active: Tab; setActive: (tab: T
     <header className="topbar">
       <Brand onClick={() => setActive("Overview")}/>
       <nav className="tabs" aria-label="Dashboard sections">
-        {tabs.map(({ tab, icon }) => (
-          <button key={tab} className={active === tab ? "active" : ""} onClick={() => setActive(tab)}>
+        {tabs.map(({ tab, icon, label }) => (
+          <button key={tab} className={active === tab ? "active" : ""} onClick={() => setActive(tab)} title={label ?? tab}>
             <Icon name={icon}/>
-            {tab}
+            <span>{label ?? tab}</span>
           </button>
         ))}
       </nav>
@@ -112,6 +116,8 @@ export default function App() {
       <Header active={active} setActive={setActive} onLock={lock}/>
       {active === "Overview" && <Overview/>}
       {active === "Focus" && <Focus/>}
+      {active === "Meetings" && <Meetings/>}
+      {active === "Guidelines" && <Guidelines/>}
       <footer><span>WORK DASHBOARD · PRIVATE</span><span>{syncMeta.enabled ? "Source of truth: Google Drive › Work Dashboard" : "Saved in this browser · connect Google Drive to sync"} <i/></span></footer>
     </div>
   );

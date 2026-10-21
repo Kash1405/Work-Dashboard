@@ -4,14 +4,17 @@ A private, single-page work dashboard (React + Vite + Tailwind v4), styled with 
 
 - **Lock screen**: password unlock, the same as the Personal Dashboard.
 - **Overview**: a rotating city-skyline hero with a countdown to your next event or timed task, plus Daily Tasks, Overall Goals, Links, Calendar and Notes.
+- **Overview** also shows a rotating quote (a new one every 5 hours, or press *Next quote*).
 - **Focus**: a session timer and the completed-task log.
+- **Meetings**: a meeting-minutes template (details, attendance, agenda, discussion, decisions, action items, next steps). Submitted minutes are listed by meeting name, sorted by when they were first submitted, and can be expanded, edited, copied as text or deleted.
+- **Guidelines & Shortcuts**: Word, PowerPoint and Excel sections, each with an editable shortcuts table, editable quality checklists (add as many as you like), and reference links.
 
 ## Google sign-in and sync
 
 Sign in with Google from the sync menu at the top right to keep everything in a **Work Dashboard** folder in your Google Drive:
 
-- **Dashboard Data** (Sheet): Settings, Links, Daily Tasks, Goals and Calendar Events tabs.
-- **Dashboard Logs** (Sheet): Focus Sessions.
+- **Dashboard Data** (Sheet): Settings, Links, Daily Tasks, Goals, Calendar Events, Shortcuts, Checklists and Guide Links tabs.
+- **Dashboard Logs** (Sheet): Focus Sessions and Meeting Minutes (one row per meeting; action items are one per line, as `[ ] Task | Owner | Due`).
 - **Notes** (Doc).
 
 Changes upload a couple of seconds after you make them, and edits made in Drive load in every 30 seconds. If both sides changed, Drive wins. **Link Google Calendar** on the Calendar panel to show your Google events and to add or delete them from the dashboard.

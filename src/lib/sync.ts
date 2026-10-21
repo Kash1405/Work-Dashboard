@@ -4,8 +4,9 @@ import { peekStored, setStored, subscribeAll, useStored } from "./store";
 import { TABLES, applyNotes, cellText, noteRows, notesHtml, parseNotes, type Cell, type FileRole, type Table } from "./tables";
 
 // Google Drive is the source of truth. Everything lives in a visible "Work Dashboard" folder:
-//   Dashboard Data  (Google Sheet) – one tab per input list (tasks, goals, links, events, settings)
-//   Dashboard Logs  (Google Sheet) – the focus session history
+//   Dashboard Data  (Google Sheet) – one tab per input list (tasks, goals, links, events, settings,
+//                                    shortcuts, checklists, guide links)
+//   Dashboard Logs  (Google Sheet) – the focus session history and meeting minutes
 //   Notes           (Google Doc)   – the notes list
 //   About this folder (Google Doc) – how it works
 // Each tab is synced on its own with a three-way check against what this device last wrote:
@@ -195,8 +196,8 @@ const readme = () => `<html><body><h1>Work Dashboard</h1>
 <p>This folder is the source of truth for your Work Dashboard. The dashboard reads from it and writes back to it.</p>
 <h2>What is here</h2>
 <ul>
-<li><b>Dashboard Data</b> (Sheet): your inputs. One tab each for settings, links, daily tasks, goals and calendar events.</li>
-<li><b>Dashboard Logs</b> (Sheet): your focus session history.</li>
+<li><b>Dashboard Data</b> (Sheet): your inputs. One tab each for settings, links, daily tasks, goals, calendar events, and the Guidelines &amp; Shortcuts tab's shortcuts, checklists and links.</li>
+<li><b>Dashboard Logs</b> (Sheet): your focus session history and meeting minutes (one row per meeting; action items are one per line, like “[ ] Task | Owner | 2026-10-30”).</li>
 <li><b>Notes</b> (Doc): your notes. Each starts with a line like “— 2026-10-18 09:30 —”.</li>
 </ul>
 <h2>How syncing works</h2>
@@ -327,7 +328,9 @@ async function runSync(full: boolean) {
       const last = hashes[table.sheet];
       if (remote) {
         const remoteHash = rowsHash(remote[table.sheet]);
-        if (remoteHash !== last && !fresh.has(role)) {
+        // A tab this device has never synced that is empty in Drive (just added by this version) keeps the local rows.
+        const newEmptyTab = last === undefined && remote[table.sheet].length === 0;
+        if (remoteHash !== last && !fresh.has(role) && !newEmptyTab) {
           // Edited in Drive (or first sync on this device): Drive wins.
           applyQuietly(() => table.apply(remote[table.sheet]));
           hashes[table.sheet] = remoteHash;
